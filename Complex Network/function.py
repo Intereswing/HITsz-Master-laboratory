@@ -12,20 +12,7 @@ def node_degree_distribution(adj_G):
         else:
             degree_count[degree] = 1
 
-    sorted_degree = sorted(degree_count.keys())
-    sorted_count = [degree_count[sort] for sort in sorted_degree]
-
-    max_degree = max(sorted_degree)
-    max_node = max(sorted_count)
-    degrees_range = np.arange(0, max_degree + 1)
-    node_range = np.arange(0, max_node + 1)
-    plt.bar(sorted_degree, sorted_count)
-    plt.xticks(degrees_range)
-    plt.yticks(node_range)
-    plt.xlabel('Degree')
-    plt.ylabel('Number of Nodes')
-    plt.title('Degree Distribution')
-    plt.show()
+    return degree_count
 
 
 def floyd_warshall(adj_matrix):
@@ -59,6 +46,7 @@ def average_shortest_path_length(adj_matrix):
 
     total_length = 0
     count = 0
+    length_count = {}
 
     # 计算所有可达节点之间的最短路径和总数
     for i in range(n):
@@ -67,8 +55,30 @@ def average_shortest_path_length(adj_matrix):
                 total_length += dist_matrix[i][j]
                 count += 1
 
+                if dist_matrix[i][j] in length_count:
+                    length_count[dist_matrix[i][j]] += 1
+                else:
+                    length_count[dist_matrix[i][j]] = 1
+
     # 返回平均最短路径长度
-    return total_length / count if count > 0 else 0
+    avg_path_len =  total_length / count if count > 0 else 0
+    return avg_path_len, length_count
+
+
+def visualization_distribution(count: dict, height_step, attr):
+    sorted_length = sorted(count.keys())
+    sorted_count = [count[sort] for sort in sorted_length]
+    max_length = max(sorted_length)
+    max_node = max(sorted_count)
+    length_range = np.arange(0, max_length + 1)
+    node_range = np.arange(0, max_node + 1, height_step)
+    plt.bar(sorted_length, sorted_count)
+    plt.xticks(length_range)
+    plt.yticks(node_range)
+    plt.xlabel(attr)
+    plt.ylabel('Number of Nodes')
+    plt.title(attr + 'Distribution')
+    plt.show()
 
 
 # 计算给定节点的聚类系数
@@ -182,7 +192,7 @@ def attack_random(G: ndarray, attack_proportions: ndarray):
     for att_node_num in attack_node_numbers:
         res_nodes = np.random.choice(all_nodes, G.shape[0]-att_node_num, replace=False)
         res_G = G[res_nodes, :][:, res_nodes]
-        paths.append(average_shortest_path_length(res_G))
+        paths.append(average_shortest_path_length(res_G)[0])
         sub_graphs.append(largest_subgraph(res_G))
 
     origin_path = paths[0]
@@ -204,7 +214,7 @@ def attack_intentional(G: ndarray, attack_proportions: ndarray):
         else:
             res_nodes = nodes_by_degree
         res_G = G[res_nodes, :][:, res_nodes]
-        paths.append(average_shortest_path_length(res_G))
+        paths.append(average_shortest_path_length(res_G)[0])
         sub_graphs.append(largest_subgraph(res_G))
 
     origin_path = paths[0]
@@ -233,9 +243,17 @@ def visualization_coreness(coreness_list):
     plt.show()
 
 
+def visualization_graph(G: ndarray):
+    G_nx = nx.from_numpy_array(G)
+    plt.figure(figsize=[10, 10])
+    nx.draw(G_nx, with_labels=False, node_size=10)
+    plt.show()
+
+
 # TEST
 if __name__ == '__main__':
     sample_graph = np.array([[0,1,0,0,1],[1,0,0,0,1],[0,0,0,0,0],[0,0,0,0,1],[1,1,0,1,0]])
+    visualization_graph(sample_graph)
     print(largest_subgraph(sample_graph))
     print(coreness(sample_graph))
 
