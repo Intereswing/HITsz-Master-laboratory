@@ -94,14 +94,41 @@ def clustering_coefficient_for_node(adj_G, node):
     return edges_between_neighbors / possible_connections
 
 
+def clustering_coefficient_histogram(every_node_clustering, bin_width=0.005):
+    if every_node_clustering is None or len(every_node_clustering) == 0:
+        raise ValueError("Input must be a non-empty list or array.")
+
+    # 计算直方图
+    counts, bins = np.histogram(every_node_clustering,
+                                bins=np.arange(min(every_node_clustering), max(every_node_clustering) + bin_width,
+                                bin_width))
+
+    # 绘制直方图
+    plt.bar(bins[:-1], counts, width=bin_width, align='edge', color='blue', edgecolor='black', alpha=0.7)
+    # 添加图表标题和标签
+    plt.title('Clustering Coefficient Histogram')
+    plt.xlabel('Clustering Coefficient Ranges')
+    plt.ylabel('Count')
+
+    # 显示网格
+    plt.grid(axis='y')
+
+    # 展示图表
+    plt.show()
+
+
 # 计算整个图的平均聚类系数
 def average_clustering_coefficient(adj_G):
     total_clustering = 0.0
     num_nodes = adj_G.shape[0]
-
+    every_node_clustering = []
     for node in range(num_nodes):
-        total_clustering += clustering_coefficient_for_node(adj_G, node)
+        val = clustering_coefficient_for_node(adj_G, node)
+        every_node_clustering.append(val)
+        total_clustering += val
 
+    every_node_clustering.sort()
+    clustering_coefficient_histogram(every_node_clustering)
     return total_clustering / num_nodes
 
 
@@ -237,3 +264,15 @@ if __name__ == '__main__':
         attr='Largest Subgraph'
     )
     visualization_coreness(coreness(sample_graph))
+
+    # 生成一个随机的60x60的邻接矩阵
+    np.random.seed(42)  # 固定随机种子以确保结果可重复
+    adj_matrix = np.random.randint(0, 2, size=(60, 60))
+
+    # 确保邻接矩阵对称（无向图），对角线为0（无自环）
+    adj_matrix = np.tril(adj_matrix, -1) + np.tril(adj_matrix, -1).T
+
+    print(adj_matrix)  # 输出邻接矩阵
+    average_clustering_coefficient(adj_matrix)
+
+
