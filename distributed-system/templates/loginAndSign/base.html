@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for("static", filename="css/Bootstrap/bootstrap.css") }}">
+    <link rel="stylesheet" href="{{ url_for("static", filename="css/loginAndSign.css") }}">
+    <script src="{{ url_for("static", filename="js/Bootstrap/bootstrap.bundle.js") }}"></script>
+    <script src="{{ url_for("static", filename="js/jquery.min.js") }}"></script>
+    <script src="{{ url_for("static", filename="js/SocketIO/socket.io.min.js") }}"></script>
+</head>
+<body>
+{% block body %}
+{% endblock %}
+</body>
+</html>

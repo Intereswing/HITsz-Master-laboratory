@@ -1,0 +1,234 @@
+{% extends "gamePart/base.html" %}
+
+{% block title %}GoMoKu - 进行游戏{% endblock %}
+
+{% block external %}
+    <link rel="stylesheet" type="text/css" href="{{ url_for("static", filename="css/game.css") }}">
+{% endblock %}
+
+{% block content %}
+    <table id="userTable">
+        <tr>
+            <td>用户名：{{ user1Name }}（黑）</td>
+            <td>用户名：{{ user2Name }}（白）</td>
+        </tr>
+    </table>
+    <table id="systemTable">
+        <tr>
+            <td id="systemMsg">黑方回合</td>
+        </tr>
+    </table>
+    <table id="gameTable">
+        <tbody>
+        {% for i in range(10) %}
+            <tr>
+                {% for j in range(10) %}
+                    <td class="gameCell">
+                        <img id="cell-{{ i }}-{{ j }}" src="{{ url_for("static", filename="img/background.png") }}"
+                             alt="" onclick="changeImage(this)">
+                    </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <!-- 和局弹窗 -->
+    <div id="confirmDialog" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+            <!-- Modal content-->
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">和局请求</h4>
+                </div>
+                <div class="modal-body" style="text-align: center">
+                    <p>你是否接受对方的和局请求？</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-warning" data-dismiss="modal" onclick="rejectApply()">拒绝
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="acceptApply()">接受</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 拒绝弹窗 -->
+    <div id="infoDialog" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">请求被拒绝</h4>
+                </div>
+                <div class="modal-body">
+                    <p>很抱歉，您的和局请求被对方拒绝，请继续游戏。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal"
+                            onclick="confirmReject()">确认
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 对方掉线弹窗 -->
+    <div id="timeoutDialog" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">对手掉线</h4>
+                </div>
+                <div class="modal-body">
+                    <p>很抱歉，您的对手掉线了，您可以重新加入游戏。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-dismiss="modal"
+                            onclick="confirmTimeout()">确认
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById("logout").disabled = true;
+
+        const userId = {{ userId }};
+        const roomId = "{{ roomId }}";
+        const first = {{ first }};
+        let move = false;
+
+        // 下棋并换手
+        function changeImage(imgElement) {
+            if (move) {
+                socket.emit("change", {"place": imgElement.id, "roomId": roomId, "first": first});
+            }
+        }
+
+        // 返回用户中心
+        function toUserCenter() {
+            socket.emit("leave", {"roomId": roomId});
+            socket.close();
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = "/userCenter";
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "userId";
+            input.value = userId;
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // 请求和局
+        function applyDraw() {
+            socket.emit("applyDraw", {"roomId": roomId, "first": first});
+        }
+
+        function acceptApply() {
+            socket.emit("acceptApply", {"roomId": roomId});
+            $("#confirmDialog").modal("hide");
+        }
+
+        function rejectApply() {
+            socket.emit("rejectApply", {"roomId": roomId, "first": first});
+            $("#confirmDialog").modal("hide");
+        }
+
+        function confirmReject() {
+            $("#infoDialog").modal("hide");
+        }
+
+        function confirmTimeout() {
+            $("#timeoutDialog").modal("hide");
+        }
+
+        $(document).ready(function () {
+            const span = $("<span></span>").text("{{ userName }}");
+            let sendHeartbeat = true;
+            document.getElementById("logout").classList.add("disabled");
+            $(".navbar-text").prepend(span);
+            // 初始化游戏
+            socket.on("connect", function () {
+                socket.emit("start", {"first": first, "roomId": roomId});
+                setInterval(function() {
+                    // 定时发送心跳包，检测掉线情况
+                    if (sendHeartbeat) {
+                        socket.emit("heartbeat", {"roomId": roomId, "first": first});
+                    }
+                }, 1000);
+            });
+            socket.on("startChecked", function () {
+                move = true;
+            });
+            // 进行棋子的替换
+            socket.on("changeChecked", function (data) {
+                const sysMsg = document.getElementById("systemMsg");
+                const imgElement = document.getElementById(data["place"]);
+                if (data["isBlack"]) {
+                    imgElement.src = "{{ url_for("static", filename="img/blackStone.png") }}";
+                    sysMsg.textContent = "白方回合";
+                } else {
+                    imgElement.src = "{{ url_for("static", filename="img/whiteStone.png") }}";
+                    sysMsg.textContent = "黑方回合";
+                }
+                move = !move;
+            });
+            // 游戏结束
+            socket.on("gameOver", function (data) {
+                move = false;
+                sendHeartbeat = false;
+                const sysMsg = document.getElementById("systemMsg");
+
+                if (data["firstWin"]) {
+                    if (first) {
+                        sysMsg.textContent = "我方胜利！";
+                    } else {
+                        sysMsg.textContent = "对方胜利！";
+                    }
+                    // sysMsg.textContent = "黑方胜利！";
+                } else {
+                    if (first) {
+                        sysMsg.textContent = "对方胜利！";
+                    } else {
+                        sysMsg.textContent = "我方胜利！";
+                    }
+                }
+                const welcome = document.getElementById("welcome");
+                welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>返回用户中心</button>";
+            });
+            // 进行和局
+            socket.on("draw", function () {
+                const welcome = document.getElementById("welcome");
+                welcome.innerHTML = "<button class='btn btn-info text-white' onclick='applyDraw()'>请求和局</button>";
+            });
+            // 接受和局请求
+            socket.on("apply", function (data) {
+                if (data["first"] !== first) {
+                    $('#confirmDialog').modal('show');
+                }
+            });
+            // 双方和局
+            socket.on("drawn", function () {
+                move = false;
+                document.getElementById("systemMsg").textContent = "双方合局";
+                const welcome = document.getElementById("welcome");
+                welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>返回用户中心</button>";
+            });
+            // 拒绝和局
+            socket.on("rejected", function (data) {
+                if (data["first"] !== first) {
+                    $("#infoDialog").modal("show");
+                }
+            });
+            // 对方掉线
+            socket.on("timeout", function() {
+                $("#timeoutDialog").modal("show");
+                move = false;
+                sendHeartbeat = false;
+                document.getElementById("systemMsg").textContent = "对手掉线";
+                const welcome = document.getElementById("welcome");
+                welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>返回用户中心</button>";
+                socket.emit("leave", {"roomId": roomId});
+            });
+        });
+    </script>
+{% endblock %}

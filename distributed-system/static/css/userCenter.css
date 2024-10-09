@@ -1,0 +1,12 @@
+.card-header div {
+    display: flex;
+    align-items: center;
+}
+
+.card-header a {
+    border: none;
+}
+
+.card-header a:hover {
+    text-decoration: none;
+}

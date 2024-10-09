@@ -1,0 +1,110 @@
+{% extends 'loginAndSign/base.html' %}
+
+{% block title %}
+    GoMoKu - 用户注册
+{% endblock %}
+
+{% block body %}
+    <div class="container">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title text-center">用户注册</h3>
+                    <form id="sign-form">
+                        <!-- <div class="mb-3">
+                            <label for="email" class="form-label">邮箱</label>
+                            <input type="email" class="form-control" id="email" name="email" required>
+                        </div> -->
+                        <div class="mb-3">
+                            <label for="nickname" class="form-label">昵称</label>
+                            <input type="text" class="form-control" id="nickname" name="nickname" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="confirm-password" class="form-label">确认密码</label>
+                            <input type="password" class="form-control" id="confirm-password" name="confirm-password"
+                                   required>
+                        </div>
+                        <div id="password-error" class="alert alert-danger d-none" role="alert">
+                            两次输入的密码不匹配，请重新输入。
+                        </div>
+                        <button type="submit" id="sign" class="btn btn-primary w-100">注册</button>
+                    </form>
+                    <script>
+                        // 获取对应的页面对象
+                        const password = document.querySelector('#password');
+                        const confirmPassword = document.querySelector('#confirm-password');
+                        const submitButton = document.querySelector('button[type="submit"]');
+                        // 判断两次输入的密码是否相同
+                        confirmPassword.addEventListener('input', () => {
+                            if (password.value !== confirmPassword.value) {
+                                submitButton.disabled = true;
+                                confirmPassword.setCustomValidity('两次输入的密码不相同');
+                            } else {
+                                submitButton.disabled = false;
+                                confirmPassword.setCustomValidity('');
+                            }
+                        });
+                        // 如果相同显示错误提示框
+                        $(document).ready(function () {
+                            $("#confirm-password").on('input', function () {
+                                if ($(this).val() !== $('#password').val()) {
+                                    $('#password-error').removeClass('d-none');
+                                } else {
+                                    $('#password-error').addClass('d-none');
+                                }
+                            });
+                        });
+                    </script>
+                    <hr>
+                    <div class="text-center">
+                        <p>已有账号？</p>
+                        <a href="#" onclick="toLogin()">立即登录</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const socket = io.connect("http://192.168.1.252:5000");
+	let shown = false;
+        // 提交用户登录的数据
+        document.getElementById("sign-form").addEventListener("submit", function (event) {
+            event.preventDefault();
+            // const email = document.getElementById("email").value;
+            const nickname = document.getElementById("nickname").value;
+            const password = document.getElementById("password").value;
+            socket.emit("sign", { "nickname": nickname, "password": password});
+        });
+        // 用户注册成功，返回登录界面
+        socket.on("sign_success", function () {
+            socket.close();
+            window.location.href = "{{ url_for("login") }}";
+        });
+        // 用户注册失败，提示用户邮箱已被注册
+        socket.on("sign_fail", function () {
+	    if (!shown) {
+                const alertDiv = document.createElement("div");
+                alertDiv.id = "signed-error"
+                alertDiv.className = "alert alert-danger";
+                alertDiv.innerText = "您当前输入的邮箱已经被注册过，请进行登录";
+                alertDiv.setAttribute("role", "alert");
+                const cardBodyDiv = document.querySelector(".card-body");
+                const signForm = document.querySelector("#sign-form");
+            	cardBodyDiv.insertBefore(alertDiv, signForm);
+		shown = true;
+	    }
+        });
+        // 进行向登录界面的页面跳转
+        function toLogin() {
+            socket.emit("toLogin");
+        }
+        socket.on("go", function (data) {
+            socket.close();
+            window.location.href = data["url"];
+        });
+    </script>
+{% endblock %}

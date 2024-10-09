@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <title>{% block title %}{% endblock %}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/Bootstrap/bootstrap.min.css') }}">
+    <script src="{{ url_for('static', filename='js/Bootstrap/bootstrap.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+    <script src="{{ url_for("static", filename="js/SocketIO/socket.io.min.js") }}"></script>
+    {% block external %}{% endblock %}
+</head>
+<body>
+<nav class="navbar navbar-primary bg-primary text-white">
+    <div class="container-fluid">
+        <span class="navbar-brand mb-0 h1 text-white" id="welcome">欢迎登录 五子棋系统！</span>
+        <div class="navbar-text text-white">
+            <a href="#" class="btn btn-outline-light ms-2 text-white" onclick="toLogin()" id="logout">注销</a>
+        </div>
+    </div>
+    <script>
+        const socket = io.connect("http://192.168.1.252:5000");
+        // 192.168.1.252:5000
+        function toLogin() {
+            socket.emit("toLogin");
+        }
+
+        // 注销跳转回登录界面
+        socket.on("go", function (data) {
+            socket.close();
+            window.location.href = data["url"];
+        });
+    </script>
+</nav>
+
+<div class="container">
+    {% block content %}{% endblock %}
+</div>
+</body>
+</html>

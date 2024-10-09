@@ -1,0 +1,149 @@
+{% extends "gamePart/base.html" %}
+
+{% block title %}GoMoKu - 用户中心{% endblock %}
+
+{% block external %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/userCenter.css') }}">
+{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mx-auto">用户中心</h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">用户名：<span id="user-name"></span></p>
+                <!-- <p class="card-text">邮箱：<span id="user-email"></span></p> -->
+                <p class="card-text">在线对战次数：<span id="total-game-time"></span></p>
+                <p class="card-text">在线取胜次数：<span id="win-game-time"></span></p>
+                <p class="card-text">胜率：<span id="win-rate"></span></p>
+            </div>
+            <div class="card-footer text-center">
+                <div class="row d-flex justify-content-center">
+                    <div class="col-sm-1">
+                        <div class="row">
+                            <a href="#" class="btn btn-primary btn-block" onclick="joinGame()">开始游戏</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 等待其他玩家加入的弹窗 -->
+    <div class="modal fade" id="joinWaitModal" tabindex="-1" aria-labelledby="joinWaitModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="joinWaitModalLabel">游戏等待</h5>
+                </div>
+                <div class="modal-body">
+                    <p>请稍候，正在等待其他玩家加入。</p>
+                    <p>已等待 <span id="wait-time">0</span> 秒...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 提示稍后重新加入游戏的弹窗 -->
+    <div class="modal fade" id="joinFailModal" tabindex="-1" aria-labelledby="joinFailModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="joinFailModalLabel">稍后重试</h5>
+                </div>
+                <div class="modal-body">
+                    <p>当前在线玩家较少，请稍后重试。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const userID = {{ userId }};
+        let joined = false;
+        let showed = false;
+
+        function joinGame() {
+            if (!joined) {
+                socket.emit("joinGame", {"userId": userID});
+                joined = true;
+            }
+            if (showed && !$("#joinWaitModal").is(":visible")) {
+                $('#joinWaitModal').modal('show');
+            }
+        }
+
+        $(document).ready(function () {
+            socket.on("connect", function () {
+                socket.emit("connected", {"userId": userID});
+            });
+            // 更新用户信息
+            socket.on("user_info", function (data) {
+                $("#user-name").text(data["userName"]);
+                // $("#user-email").text(data["email"]);
+                $("#total-game-time").text(data["totalGameTime"]);
+                $("#win-game-time").text(data["winGameTime"]);
+                $("#win-rate").text(data["winRate"] + "%");
+                const span = $("<span></span>").text(data["userName"]);
+                $(".navbar-text").prepend(span);
+            });
+            // 弹窗提示
+            socket.on('joinWait', function (data) {
+                if (!showed) {
+                    $('#joinWaitModal').modal('show');
+                    showed = true;
+                }
+                $("#wait-time").text(data["time"]);
+            });
+            socket.on("joinFail", function () {
+                showed = false;
+                joined = false;
+                $('#joinWaitModal').modal('hide');
+                $('#joinFailModal').modal('show');
+                setTimeout(function () {
+                    $('#joinFailModal').modal('hide');
+                }, 1500);
+            });
+            // 加入游戏，进入游戏页面
+            socket.on("joinSuccess", function (data) {
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "/game";
+                const inputUser1Name = document.createElement("input");
+                inputUser1Name.type = "hidden";
+                inputUser1Name.name = "user1Name";
+                inputUser1Name.value = data["user1Name"];
+                form.appendChild(inputUser1Name);
+                const inputUser2Name = document.createElement("input");
+                inputUser2Name.type = "hidden";
+                inputUser2Name.name = "user2Name";
+                inputUser2Name.value = data["user2Name"];
+                form.appendChild(inputUser2Name);
+                const inputRoomId = document.createElement("input");
+                inputRoomId.type = "hidden";
+                inputRoomId.name = "roomId";
+                inputRoomId.value = data["roomId"];
+                form.appendChild(inputRoomId);
+                const inputUserId = document.createElement("input");
+                inputUserId.type = "hidden";
+                inputUserId.name = "userId";
+                inputUserId.value = data["userId"];
+                form.appendChild(inputUserId);
+                const inputUserName = document.createElement("input");
+                inputUserName.type = "hidden";
+                inputUserName.name = "userName";
+                inputUserName.value = data["userName"];
+                form.appendChild(inputUserName);
+                const inputFirst = document.createElement("input");
+                inputFirst.type = "hidden";
+                inputFirst.name = "first";
+                inputFirst.value = data["first"];
+                form.appendChild(inputFirst);
+                socket.close();
+                document.body.appendChild(form);
+                form.submit();
+            });
+        });
+    </script>
+{% endblock %}

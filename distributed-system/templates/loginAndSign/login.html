@@ -1,0 +1,80 @@
+{% extends "loginAndSign/base.html" %}
+
+{% block title %}GoMoKu - 用户登录{% endblock %}
+
+{% block body %}
+    <div class="container">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title text-center">用户登录</h3>
+                    <form id="login-form">
+                        <div class="mb-3">
+                            <label for="userName" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="userName" name="userName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">登录</button>
+                    </form>
+                    <hr>
+                    <div class="text-center">
+                        
+                        <h4 class="card-title text-center">还没有账号？</h3>
+                        <button class="btn btn-primary w-100" href="#" onclick="toSign()">立即注册</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const socket = io.connect("http://192.168.1.252:5000");
+	let shown = false;
+        // 提交用户登录的数据
+        document.getElementById("login-form").addEventListener("submit", function (event) {
+            event.preventDefault();
+            const userName = document.getElementById("userName").value;
+            const password = document.getElementById("password").value;
+            socket.emit("login", {"userName": userName, "password": password});
+        });
+        // 提交数据正确，提交数据进入用户中心
+        socket.on("login_success", function (data) {
+            const id = data["userId"];
+            socket.close();
+            const form = document.createElement("form");
+            form.method = "POST";
+            form.action = "/userCenter";
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "userId";
+            input.value = id;
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+        });
+        // 提交数据错误，显示错误提示
+        socket.on("login_fail", function () {
+	    if (!shown) {
+                const alertDiv = document.createElement("div");
+                alertDiv.id = "login-error"
+                alertDiv.className = "alert alert-danger";
+                alertDiv.innerText = "登录失败，请检查用户名和密码";
+                alertDiv.setAttribute("role", "alert");
+                const cardBodyDiv = document.querySelector(".card-body");
+                const loginForm = document.querySelector("#login-form");
+            	cardBodyDiv.insertBefore(alertDiv, loginForm);
+		shown = true;
+	    }
+        });
+        // 跳转到注册界面
+        function toSign() {
+            socket.emit("toSign");
+        }
+        socket.on("go", function(data) {
+            socket.close();
+            window.location.href = data["url"];
+        });
+    </script>
+{% endblock %}
