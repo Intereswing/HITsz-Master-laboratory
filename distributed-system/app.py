@@ -41,7 +41,7 @@ def handleLogin(data):
     user = db.execute(
         'SELECT * FROM user WHERE username = ?', (username,)
     ).fetchone()
-    if username is None:
+    if user is None:
         error = 'Incorrect username.'
     elif user['password'] != password:
         error = 'Incorrect password.'
@@ -49,7 +49,7 @@ def handleLogin(data):
     if error is None:
         emit("login_success", {"userId": user['id']})
     else:
-        emit(error)
+        emit("login_fail")
 
 
 @socketio.on("toSign")
