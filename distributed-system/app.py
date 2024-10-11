@@ -1,6 +1,7 @@
 import os
 import threading
 import time
+from typing import Optional
 
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -315,7 +316,7 @@ class RoomManager:
             if room_id in self.availableRoomIds:
                 self.availableRoomIds.remove(room_id)
 
-    def getRoom(self, room_id: str) -> Room | None:
+    def getRoom(self, room_id: str) -> Optional[Room]:
         # 获取一个指定ID的游戏房间
         with self.lock:
             if room_id in self.rooms:
