@@ -9,15 +9,17 @@
 {% block content %}
     <table id="userTable">
         <tr>
-            <td>用户名：{{ user1Name }}（黑）</td>
-            <td>用户名：{{ user2Name }}（白）</td>
+            <td id="user1Name">用户名：{{ user1Name }}（假先方）</td>
+            <td id="user2Name">用户名：{{ user2Name }}（假后方）</td>
         </tr>
     </table>
+
     <table id="systemTable">
         <tr>
-            <td id="systemMsg">黑方回合</td>
+            <td id="systemMsg">GoMoKu Swap2</td>
         </tr>
     </table>
+
     <table id="gameTable">
         <tbody>
         {% for i in range(10) %}
@@ -25,13 +27,55 @@
                 {% for j in range(10) %}
                     <td class="gameCell">
                         <img id="cell-{{ i }}-{{ j }}" src="{{ url_for("static", filename="img/background.png") }}"
-                             alt="" onclick="changeImage(this)">
+                             alt="" onclick="playOnePiece(this)">
                     </td>
                 {% endfor %}
             </tr>
         {% endfor %}
         </tbody>
     </table>
+
+    <!-- 第一阶段结束假后方选择 -->
+    <div id="tentative_second_choosing_dialog" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">假后方选择</h4>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="chooseBlack(true)">选择黑子</button>
+                    <button type="button" class="btn btn-primary" onclick="chooseBlack(false)">选择白子</button>
+                    <button type="button" class="btn btn-primary" onclick="choosePhase2()">下两子让对方选择</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phase 2 over, tentative first choose. -->
+    <div id="tentative_first_choosing_dialog" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">假先方选择</h4>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="chooseBlack(true)">选择黑子</button>
+                    <button type="button" class="btn btn-primary" onclick="chooseBlack(false)">选择白子</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="wait_choosing_dialog" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <p>等待对方选择</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 和局弹窗 -->
     <div id="confirmDialog" class="modal fade" role="dialog">
         <div class="modal-dialog">
@@ -51,6 +95,7 @@
             </div>
         </div>
     </div>
+
     <!-- 拒绝弹窗 -->
     <div id="infoDialog" class="modal fade" role="dialog">
         <div class="modal-dialog">
@@ -69,6 +114,7 @@
             </div>
         </div>
     </div>
+
     <!-- 对方掉线弹窗 -->
     <div id="timeoutDialog" class="modal fade" role="dialog">
         <div class="modal-dialog">
@@ -87,20 +133,13 @@
             </div>
         </div>
     </div>
+
     <script>
         document.getElementById("logout").disabled = true;
 
         const userId = {{ userId }};
         const roomId = "{{ roomId }}";
-        const first = {{ first }};
-        let move = false;
-
-        // 下棋并换手
-        function changeImage(imgElement) {
-            if (move) {
-                socket.emit("change", {"place": imgElement.id, "roomId": roomId, "first": first});
-            }
-        }
+        let CanMove = false;
 
         // 返回用户中心
         function toUserCenter() {
@@ -120,7 +159,7 @@
 
         // 请求和局
         function applyDraw() {
-            socket.emit("applyDraw", {"roomId": roomId, "first": first});
+            socket.emit("applyDraw", {"roomId": roomId, "userId": userId});
         }
 
         function acceptApply() {
@@ -129,7 +168,7 @@
         }
 
         function rejectApply() {
-            socket.emit("rejectApply", {"roomId": roomId, "first": first});
+            socket.emit("rejectApply", {"roomId": roomId, "userId": userId});
             $("#confirmDialog").modal("hide");
         }
 
@@ -141,88 +180,148 @@
             $("#timeoutDialog").modal("hide");
         }
 
+        // 下棋
+        function playOnePiece(imgElement) {
+            if (CanMove) {
+                socket.emit("move", {"place": imgElement.id, "roomId": roomId, "userId": userId});
+                CanMove = false
+            }
+        }
+
+        function chooseBlack(IsBlack) {
+            // IsBlack == true means choosing black or false means choosing white.
+            socket.emit("chooseBlack", {"roomId": roomId, "userId": userId, "IsBlack": IsBlack})
+        }
+
+        function choosePhase2() {
+            socket.emit("choosePhase2", {"roomId": roomId, "userId": userId})
+        }
+
+
         $(document).ready(function () {
             const span = $("<span></span>").text("{{ userName }}");
             let sendHeartbeat = true;
             document.getElementById("logout").classList.add("disabled");
             $(".navbar-text").prepend(span);
+
             // 初始化游戏
             socket.on("connect", function () {
-                socket.emit("start", {"first": first, "roomId": roomId});
+                socket.emit("start", {"userId": userId, "roomId": roomId});
                 setInterval(function() {
                     // 定时发送心跳包，检测掉线情况
                     if (sendHeartbeat) {
-                        socket.emit("heartbeat", {"roomId": roomId, "first": first});
+                        socket.emit("heartbeat", {"roomId": roomId, "userId": userId});
                     }
                 }, 1000);
             });
-            socket.on("startChecked", function () {
-                move = true;
-            });
-            // 进行棋子的替换
-            socket.on("changeChecked", function (data) {
-                const sysMsg = document.getElementById("systemMsg");
-                const imgElement = document.getElementById(data["place"]);
-                if (data["isBlack"]) {
-                    imgElement.src = "{{ url_for("static", filename="img/blackStone.png") }}";
-                    sysMsg.textContent = "白方回合";
-                } else {
-                    imgElement.src = "{{ url_for("static", filename="img/whiteStone.png") }}";
-                    sysMsg.textContent = "黑方回合";
+
+            //Update the chess board.
+            socket.on("updateBoard", function (data) {
+                // Clear dialog
+                if ("clear" in data) {
+                    $('#tentative_second_choosing_dialog').modal('hide');
+                    $('#tentative_first_choosing_dialog').modal('hide');
+                    $('#wait_choosing_dialog').modal('hide');
                 }
-                move = !move;
+                // Update chess
+                if ("place" in data) {
+                    const imgElement = document.getElementById(data["place"]);
+                    if (data["IsBlack"]) {
+                        imgElement.src = "{{ url_for("static", filename="img/blackStone.png") }}";
+                    } else {
+                        imgElement.src = "{{ url_for("static", filename="img/whiteStone.png") }}";
+                    }
+                }
+                // Update board msg.
+                if ("msg" in data) {
+                    const sysMsg = document.getElementById("systemMsg");
+                    sysMsg.textContent = data["msg"];
+                }
+                // Update user msg.
+                if ("user1_msg" in data && "user2_msg" in data ) {
+                    const user1Msg = document.getElementById("user1Name");
+                    const user2Msg = document.getElementById("user2Name");
+                    user1Msg.textContent = data["user1_msg"];
+                    user2Msg.textContent = data["user2_msg"];
+                }
+                // Update now player.
+                if ("id" in data) {
+                    const sysMsg = document.getElementById("systemMsg");
+                    if (userId === data["id"]) {
+                        CanMove = true;
+                        sysMsg.textContent += "，我的回合";
+                    }
+                    else {sysMsg.textContent += "，对手回合";}
+
+                }
             });
+
+            socket.on("phase1Choose", function (data) {
+                const sysMsg = document.getElementById("systemMsg");
+                sysMsg.textContent = data["msg"];
+                if (userId === data["id"]) {
+                    $('#tentative_second_choosing_dialog').modal('show');
+                } else {
+                    $('#wait_choosing_dialog').modal('show');
+                }
+            })
+
+            socket.on("phase2Choose", function (data) {
+                const sysMsg = document.getElementById("systemMsg");
+                sysMsg.textContent = data["msg"];
+                if (userId === data["id"]) {
+                    $('#tentative_first_choosing_dialog').modal('show');
+                } else {
+                    $('#wait_choosing_dialog').modal('show');
+                }
+            })
+
             // 游戏结束
-            socket.on("gameOver", function (data) {
-                move = false;
+            socket.on("GameOver", function (data) {
                 sendHeartbeat = false;
                 const sysMsg = document.getElementById("systemMsg");
-
-                if (data["firstWin"]) {
-                    if (first) {
-                        sysMsg.textContent = "我方胜利！";
-                    } else {
-                        sysMsg.textContent = "对方胜利！";
-                    }
-                    // sysMsg.textContent = "黑方胜利！";
-                } else {
-                    if (first) {
-                        sysMsg.textContent = "对方胜利！";
-                    } else {
-                        sysMsg.textContent = "我方胜利！";
-                    }
+                if (data === userId) {
+                    sysMsg.textContent = "WIN"
+                }
+                else {
+                    sysMsg.textContent = "LOSE"
                 }
                 const welcome = document.getElementById("welcome");
                 welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>返回用户中心</button>";
             });
+
             // 进行和局
             socket.on("draw", function () {
                 const welcome = document.getElementById("welcome");
                 welcome.innerHTML = "<button class='btn btn-info text-white' onclick='applyDraw()'>请求和局</button>";
             });
+
             // 接受和局请求
             socket.on("apply", function (data) {
-                if (data["first"] !== first) {
+                if (data["userId"] !== userId) {
                     $('#confirmDialog').modal('show');
                 }
             });
+
             // 双方和局
             socket.on("drawn", function () {
-                move = false;
+                CanMove = false;
                 document.getElementById("systemMsg").textContent = "双方合局";
                 const welcome = document.getElementById("welcome");
                 welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>返回用户中心</button>";
             });
+
             // 拒绝和局
             socket.on("rejected", function (data) {
-                if (data["first"] !== first) {
+                if (data["userId"] !== userId) {
                     $("#infoDialog").modal("show");
                 }
             });
+
             // 对方掉线
             socket.on("timeout", function() {
                 $("#timeoutDialog").modal("show");
-                move = false;
+                CanMove = false;
                 sendHeartbeat = false;
                 document.getElementById("systemMsg").textContent = "对手掉线";
                 const welcome = document.getElementById("welcome");

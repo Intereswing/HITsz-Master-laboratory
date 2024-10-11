@@ -1,40 +1,24 @@
+import os
 import threading
 import time
-from flask import Flask, render_template, request, redirect, url_for
+
+from flask import Flask, render_template, request, redirect, url_for, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
-from flask_sqlalchemy import SQLAlchemy
 
+from db import get_db, init_app
 
-app = Flask(__name__)
+app = Flask(__name__, instance_relative_config=True)
 socketio = SocketIO(app, cors_allowed_origins="*")
 app.config["SECRET_KEY"] = "Secret of MoGoKu"
 app.config['async_mode'] = 'eventlet'
+app.config['DATABASE'] = os.path.join(app.instance_path, 'gomoku.sqlite')
+try:
+    os.makedirs(app.instance_path)
+except OSError:
+    pass
+
+init_app(app) # database
 lock = threading.Lock()
-
-""" 数据库的连接 """
-# 配置数据库信息
-HOSTNAME = "localhost"
-PORT = 3306
-USERNAME = "root"
-PASSWORD = "root"
-DATABASE = "gomoku"
-app.config["SQLALCHEMY_DATABASE_URI"] = \
-    f"mysql+pymysql://{USERNAME}:{PASSWORD}@{HOSTNAME}:{PORT}/{DATABASE}?charset=utf8mb4"
-
-# 创建与APP关联的数据库对象
-#  SQLAlchemy会读取和app.config关联的数据库信息
-db = SQLAlchemy(app)
-
-
-class User(db.Model):
-    __tablename__ = "user"
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True, nullable=False)
-    userName = db.Column(db.String(30), nullable=False)
-    password = db.Column(db.String(20), nullable=False)
-    email = db.Column(db.String(100), nullable=False, unique=True)
-    totalGameTime = db.Column(db.Integer, default=0)
-    winGameTime = db.Column(db.Integer, default=0)
-    valid = db.Column(db.Boolean, default=True)
 
 
 """ 用户登录与注册部分 """
@@ -43,20 +27,29 @@ class User(db.Model):
 @app.route("/")
 def login():
     # 渲染登录界面视图函数
-    return render_template("loginAndSign/login.html")
+    return render_template('loginAndSign/login.html')
 
 
 @socketio.on("login")
 def handleLogin(data):
+    db = get_db()
+    error = None
     # 获取用户登录输入的数据
-    userName = data["userName"]
+    username = data["userName"]
     password = data["password"]
     # 从数据库中筛选是否存在该用户
-    user = db.session.query(User).filter_by(userName=userName).first()
-    if user is not None and user.password == password:
-        emit("login_success", {"userId": user.id})
+    user = db.execute(
+        'SELECT * FROM user WHERE username = ?', (username,)
+    ).fetchone()
+    if username is None:
+        error = 'Incorrect username.'
+    elif user['password'] != password:
+        error = 'Incorrect password.'
+
+    if error is None:
+        emit("login_success", {"userId": user['id']})
     else:
-        emit("login_fail")
+        emit(error)
 
 
 @socketio.on("toSign")
@@ -68,29 +61,53 @@ def turnSign():
 @app.route("/sign")
 def sign():
     # 渲染注册界面视图函数
-    return render_template("loginAndSign/sign.html")
+    return render_template('loginAndSign/sign.html')
 
 
 @socketio.on("sign")
 def handleSign(data):
     # 获取用户用于注册的用户名，查看数据库中是否已被注册过
-    userName = data["nickname"]
-    exist = db.session.query(User).filter_by(userName=userName).first()
-    if exist is None:
-        # 如用户名未被注册，则为用户注册一个新账户
-        name = data["nickname"]
-        password = data["password"]
-        newUser = User(userName=name, password=password)
+    username = data["nickname"]
+    password = data["password"]
+    db = get_db()
+    error = None
+
+    if not username:
+        error = 'Please enter your username.'
+    elif not password:
+        error = 'Please enter your password.'
+
+    if error is None:
         lock.acquire()
         try:
-            db.session.add(newUser)
-            db.session.commit()
+            db.execute(
+                'INSERT INTO user (username, password, totalGame, winGame) VALUES (?, ?, ?, ?)',
+                (username, password, 0, 0)
+            )
+            db.commit()
+        except db.IntegrityError:
+            error = 'Username already taken.'
+        else:
+            emit("sign_success")
         finally:
             lock.release()
-        emit("sign_success")
-    else:
-        # 如该用户名已被注册，不可以用此用户名注册一个新账户
-        emit("sign_fail")
+
+
+    # if exist is None:
+    #     # 如用户名未被注册，则为用户注册一个新账户
+    #     name = data["nickname"]
+    #     password = data["password"]
+    #     newUser = User(userName=name, password=password)
+    #     lock.acquire()
+    #     try:
+    #         db.session.add(newUser)
+    #         db.session.commit()
+    #     finally:
+    #         lock.release()
+    #     emit("sign_success")
+    # else:
+    #     # 如该用户名已被注册，不可以用此用户名注册一个新账户
+    #     emit("sign_fail")
 
 
 @socketio.on("toLogin")
@@ -117,129 +134,161 @@ def userCenter():
 def updateUserinfo(data):
     # 进入用户中心页面后，更新显示用户个人信息
     userId = data["userId"]
-    user = db.session.query(User).get(userId)
+    db = get_db()
+    # user = db.session.query(User).get(userId)
+    user = db.execute(
+        'SELECT * FROM user WHERE id = ?', (userId,)
+    ).fetchone()
+
     data = {
-        "userName": user.userName,
-        "totalGameTime": user.totalGameTime,
-        "winGameTime": user.winGameTime,
-        "winRate": round((100 * user.winGameTime / user.totalGameTime), 2) if user.totalGameTime > 0 else 0
+        "userName": user['username'],
+        "totalGameTime": user['totalGame'],
+        "winGameTime": user['winGame'],
+        "winRate": round((100 * user['winGame'] / user['totalGame']), 2) if user['totalGame'] > 0 else 0
     }
     emit("user_info", data)
 
 
+# GAME CORE REFACTOR
+class UserInGame:
+    def __init__(self, userId, username, IsBlack: bool):
+        self.userId = userId
+        self.username = username
+        self.IsBlack = IsBlack
 
+    def get_userID(self):
+        return self.userId
+    def get_username(self):
+        return self.username
+    def get_IsBlack(self):
+        return self.IsBlack
+
+    def set_userID(self, userId):
+        self.userId = userId
+    def set_username(self, username):
+        self.username = username
+    def set_IsBlack(self, IsBlack: bool):
+        self.IsBlack = IsBlack
+    def rotate_black(self):
+        self.IsBlack = not self.IsBlack
 
 """ 游戏交互部分 """
-
-
 class Room:
     # 表示游戏房间的类
-    def __init__(self, room_id):
+    def __init__(self, room_id, user1: UserInGame=None, user2: UserInGame=None):
         # 初始化房间
         self.room_id = room_id
-        self.user1Id = None
-        self.user2Id = None
-        self.user1Name = None
-        self.user2Name = None
+        self.user1 = user1
+        self.user2 = user2
+
+        self.inPrePhase = True
+        self.steps = 0
         self.board = [[0] * 10 for _ in range(10)]
         self.round = 0
         self.user1Heartbeat = None
         self.user2Heartbeat = None
 
-    def addUser(self, user: User):
-        # 向房间中添加用户
-        if self.user1Id is None:
-            self.user1Id = user.id
-            self.user1Name = user.userName
-            self.user1Heartbeat = time.time()
-            # 暂时设置用户2的心跳时间，便于监听
-            self.user2Heartbeat = time.time()
-        else:
-            self.user2Id = user.id
-            self.user2Name = user.userName
-            self.user2Heartbeat = time.time()
-
+    # Get Properties.
     def getRoomId(self) -> str:
         # 获取房间号
         return self.room_id
 
-    def setRoomId(self, newId: str):
-        # 重新设置房间号
-        self.room_id = newId
+    def get_user1(self):
+        return self.user1
 
-    def isFull(self) -> bool:
-        # 判断当前房间是否满了
-        return self.user1Id is not None and self.user2Id is not None
+    def get_user2(self):
+        return self.user2
 
-    def getUser1Id(self) -> int:
-        # 获取玩家1的ID
-        return self.user1Id
+    def get_user_by_id(self, user_id):
+        if self.user1.get_userID() == int(user_id):
+            return self.user1
+        elif self.user2.get_userID() == int(user_id):
+            return self.user2
+        else:
+            return None
 
-    def getUser2Id(self) -> int:
-        # 获取玩家2的ID
-        return self.user2Id
-
-    def getUser1Name(self) -> str:
-        # 获取玩家1的名称
-        return self.user1Name
-
-    def getUser2Name(self) -> str:
-        # 获取玩家2的名称
-        return self.user2Name
-
-    def setUser1Heartbeat(self, t):
-        # 设置玩家1的心跳信息
-        self.user1Heartbeat = t
+    def get_another_user(self, user):
+        return self.user1 if self.user1 != user else self.user2
 
     def getUser1Heartbeat(self):
-        # 获取玩家1的信条信息
+        # 获取玩家1的心跳信息
         return self.user1Heartbeat
-
-    def setUser2Heartbeat(self, t):
-        # 设置玩家2的心跳信息
-        self.user2Heartbeat = t
 
     def getUser2Heartbeat(self):
         # 获取玩家2的信条信息
         return self.user2Heartbeat
 
-    def playChess(self, cell: str, first: bool) -> bool:
-        # 在指定位置落子，1表示黑子，-1表示白子
-        x, y = map(int, cell.split('-')[1:])
-        if self.board[x][y] == 0:
-            self.board[x][y] = 1 if first else -1
-            return True
-        else:
-            return False
-
-    def checkWin(self):
-        # 检查行
-        for i in range(10):
-            for j in range(6):
-                if abs(sum(self.board[i][j:j + 5])) == 5:
-                    return self.board[i][j]
-        # 检查列
-        for i in range(6):
-            for j in range(10):
-                if abs(sum(self.board[k][j] for k in range(i, i + 5))) == 5:
-                    return self.board[i][j]
-        # 检查左上到右下的对角线
-        for i in range(6):
-            for j in range(6):
-                if abs(sum(self.board[i + k][j + k] for k in range(5))) == 5:
-                    return self.board[i][j]
-        # 检查右上到左下的对角线
-        for i in range(6):
-            for j in range(9, 3, -1):
-                if abs(sum(self.board[i + k][j - k] for k in range(5))) == 5:
-                    return self.board[i][j]
-        return None
+    def isFull(self) -> bool:
+        # 判断当前房间是否满了
+        return self.user1 is not None and self.user2 is not None
 
     def getRound(self) -> int:
         return self.round
 
+    def getSteps(self) -> int:
+        return self.steps
+
+    def isInPrePhase(self):
+        return self.inPrePhase
+
+
+    # Modify Properties.
+    def setRoomId(self, newId: str):
+        # 重新设置房间号
+        self.room_id = newId
+
+    def addUser(self, user):
+        # 向房间中添加用户
+        if self.user1 is None:
+            self.user1 = user
+            self.user1Heartbeat = time.time()
+            # 暂时设置用户2的心跳时间，便于监听
+            self.user2Heartbeat = time.time()
+        else:
+            self.user2 = user
+            self.user2Heartbeat = time.time()
+
+    def setUser1Heartbeat(self, t):
+        # 设置玩家1的心跳信息
+        self.user1Heartbeat = t
+
+    def setUser2Heartbeat(self, t):
+        # 设置玩家2的心跳信息
+        self.user2Heartbeat = t
+
     def addRound(self) -> None:
         self.round = self.round + 1
+
+    def setInPrePhase(self, inPrePhase: bool):
+        self.inPrePhase = inPrePhase
+
+
+    # Core.
+    def playChess(self, cell: str, user: UserInGame) -> bool:
+        # 在指定位置落子，1表示黑子，-1表示白子
+        x, y = map(int, cell.split('-')[1:])
+        if self.board[x][y] == 0:
+            self.board[x][y] = 1 if user.get_IsBlack() else -1
+            self.steps += 1
+            return True
+        else:
+            return False
+
+
+    def checkWin(self):
+        # Every 5 continuous pieces has one highest then leftmost piece.
+        # Then traversing every point with four patterns can simultaneously traverse any possible winning patterns.
+        for i in range(10):
+            for j in range(10):
+                # east line
+                if j < 6 and abs(sum([self.board[i][j + k] for k in range(5)])) == 5: return self.board[i][j]
+                # southeast line
+                if i < 6 and j < 6 and abs(sum([self.board[i+k][j+k] for k in range(5)])) == 5: return self.board[i][j]
+                # south line
+                if i < 6 and abs(sum([self.board[i+k][j] for k in range(5)])) == 5: return self.board[i][j]
+                # southwest line
+                if i < 6 and j > 3 and abs(sum([self.board[i+k][j-k] for k in range(5)])) == 5: return self.board[i][j]
+        return None
 
 
 class RoomManager:
@@ -266,7 +315,7 @@ class RoomManager:
             if room_id in self.availableRoomIds:
                 self.availableRoomIds.remove(room_id)
 
-    def getRoom(self, room_id: str):
+    def getRoom(self, room_id: str) -> Room | None:
         # 获取一个指定ID的游戏房间
         with self.lock:
             if room_id in self.rooms:
@@ -279,14 +328,9 @@ class RoomManager:
         with self.lock:
             if len(self.availableRoomIds) > 0:
                 room_id = self.availableRoomIds.pop(0)
-                return self.rooms.pop(room_id)
+                return self.rooms[room_id]
             else:
                 return None
-
-    def updateRoom(self, roomId: str, room: Room):
-        # 更新字典中的键值对
-        with self.lock:
-            self.rooms[roomId] = room
 
 
 # 实例化RoomManager
@@ -304,28 +348,32 @@ room_cnt = 0
 def joinGame(data):
     # 实现用户进入游戏
     userId = data["userId"]
-    room = roomManager.getAvailRoom()
+    db = get_db()
+    user = db.execute(
+        'SELECT * FROM user WHERE id = ?', (userId,)
+    ).fetchone()
+    user_in_game = UserInGame(int(user['id']), user['username'], IsBlack=False)
+    room: Room = roomManager.getAvailRoom()
     if room:
         # 如果找到了空闲房间，可以直接开始游戏
-        user = db.session.query(User).get(userId)
-        room.addUser(user)
-        room.setRoomId(str(room.getRoomId()) + "-" + str(userId))
-        roomManager.updateRoom(room.getRoomId(), room)
+        room.addUser(user_in_game)
+        # room.setRoomId(str(room.getRoomId()) + "-" + str(userId))
+        # roomManager.updateRoom(room.getRoomId(), room)
         emit("joinSuccess", {
-            "user1Name": room.getUser1Name(),
-            "user2Name": room.getUser2Name(),
+            "user1Name": room.get_user1().get_username(),
+            "user2Name": room.get_user2().get_username(),
             "roomId": room.getRoomId(),
-            "userId": userId,
-            "userName": user.userName,
-            "first": False
+            "userId": user_in_game.get_userID(),
+            "userName": user_in_game.get_username(),
+            "IsBlack": user_in_game.get_IsBlack(),
         })
     else:
         # 如果没有空闲房间，需要进行新建
-        user = db.session.query(User).get(userId)
         global room_cnt
-        room = roomManager.createRoom(room_cnt)
+        room = roomManager.createRoom(str(room_cnt))
         room_cnt = room_cnt + 1
-        room.addUser(user)
+        user_in_game.set_IsBlack(True)
+        room.addUser(user_in_game)
         i = 0
         while not room.isFull():
             i = i + 1
@@ -335,12 +383,12 @@ def joinGame(data):
                 break
         if i <= WAIT_TIME:
             emit("joinSuccess", {
-                "user1Name": room.getUser1Name(),
-                "user2Name": room.getUser2Name(),
+                "user1Name": room.get_user1().get_username(),
+                "user2Name": room.get_user2().get_username(),
                 "roomId": room.getRoomId(),
-                "userId": userId,
-                "userName": user.userName,
-                "first": True
+                "userId": user_in_game.get_userID(),
+                "userName": user_in_game.get_username(),
+                "IsBlack": user_in_game.get_IsBlack(),
             })
         else:
             roomManager.removeRoom(room.getRoomId())
@@ -350,61 +398,165 @@ def joinGame(data):
 @app.route("/game", methods=["POST"])
 def game():
     # 游戏界面的渲染
-    user1Name = request.form.get("user1Name")
-    user2Name = request.form.get("user2Name")
     roomId = request.form.get("roomId")
     userId = request.form.get("userId")
-    userName = request.form.get("userName")
-    first = request.form.get("first")
-    return render_template("gamePart/game.html", user1Name=user1Name, user2Name=user2Name,
-                           roomId=roomId, userId=userId, userName=userName, first=first)
+    room: Room = roomManager.getRoom(roomId)
+    user = room.get_user_by_id(userId)
+    IsBlack = user.get_IsBlack()
+    # userName = request.form.get("userName")
+    # first = request.form.get("first")
+    return render_template(
+        "gamePart/game.html",
+        user1Name=room.get_user1().get_username(),
+        user2Name=room.get_user2().get_username(),
+        roomId=roomId,
+        userId=userId,
+        userName=user.get_username(),
+        IsBlack=IsBlack,
+    )
 
 
 @socketio.on("start")
 def handleStart(data):
     # 处理游戏初始化时的客户端状态
     join_room(data["roomId"])
-    if data["first"]:
+    room = roomManager.getRoom(data["roomId"])
+    user = room.get_user_by_id(data["userId"])
+
+    if user.get_IsBlack():
         # 执黑方先下棋
-        emit("startChecked")
+        emit("updateBoard", {"id": user.get_userID()}, room=data["roomId"])
 
+@socketio.on("move")
+def handleMove(data):
+    room = roomManager.getRoom(data["roomId"])
+    user = room.get_user_by_id(data["userId"])
 
-@socketio.on("change")
-def handleChange(data):
-    # 回合处理
-    place = data["place"]
-    roomId = data["roomId"]
-    first = data["first"]
-    room = roomManager.getRoom(roomId)
-    if room.playChess(place, first):
-        emit("changeChecked", {"place": place, "isBlack": first}, room=roomId)
-        room.addRound()
-        result = room.checkWin()
-        if result is not None:
-            # 有一方胜出
-            user1Id, user2Id = map(int, roomId.split("-"))
-            # user1 = db.session.query(User).get(user1Id)
-            # user1.totalGameTime = user1.totalGameTime + 1
-            # user2 = db.session.query(User).get(user2Id)
-            # user2.totalGameTime = user2.totalGameTime + 1
-            if result == 1:
-                emit("gameOver", {"firstWin": True}, room=roomId)
-                # user1.winGameTime = user1.winGameTime + 1
+    # handle the move's image.
+    if room.playChess(data["place"], user):
+        # Phase 1: tentative first player places three stones, two black and one white.
+        if room.getSteps() <= 2:
+            emit(
+                "updateBoard",
+                {
+                    "place": data["place"],
+                    "IsBlack": user.get_IsBlack(),
+                    "id": user.get_userID(), # Next move user is the same.
+                    "msg": "假先方任下三手",
+                },
+                room=data["roomId"]
+            )
+            user.rotate_black()
+
+        # Tentative second player choose: black, white or places two stones and let opposite choose.
+        elif room.getSteps() == 3:
+            other_user = room.get_another_user(user)
+            emit("updateBoard",
+                 {"place": data["place"], "IsBlack": user.get_IsBlack()}, room=data["roomId"])
+            emit("phase1Choose",
+                 {"id": other_user.get_userID(), "msg": "假后方选择"}, room=data["roomId"])
+
+        # Phase 2: tentative second player places two stones, one black and one white.
+        elif room.isInPrePhase():
+            if room.getSteps() <= 4:
+                emit(
+                    "updateBoard",
+                    {
+                        "place": data["place"],
+                        "IsBlack": user.get_IsBlack(),
+                        "id": user.get_userID(),  # Next move user is the same.
+                        "msg": "假后方任下两手",
+                    },
+                    room=data["roomId"]
+                )
+                user.rotate_black()
+            elif room.getSteps() == 5:
+                other_user = room.get_another_user(user)
+                emit("updateBoard",
+                     {"place": data["place"], "IsBlack": user.get_IsBlack()}, room=data["roomId"])
+                emit("phase2Choose",
+                     {"id": other_user.get_userID(), "msg": "假先方选择"}, room=data["roomId"])
+            else: raise RuntimeError("Already placed 5 stones, but not get in normal phase.")
+
+        # Normal play.
+        else:
+            other_user = room.get_another_user(user)
+            result = room.checkWin()
+            if result:  # this user win!
+                db = get_db()
+                db.execute(
+                    'UPDATE user SET totalGame = totalGame + 1 WHERE id IN (?, ?)',
+                    (user.get_userID(), other_user.get_userID())
+                )
+                db.execute(
+                    'UPDATE user SET winGame = winGame + 1 WHERE id = ?',
+                    (user.get_userID(),)
+                )
+                db.commit()
+                emit("updateBoard",{"place": data["place"], "IsBlack": user.get_IsBlack(),}, room=data["roomId"])
+                emit("GameOver", user.get_userID(), room=data["roomId"])
             else:
-                emit("gameOver", {"firstWin": False}, room=roomId)
-                # user2.winGameTime = user2.winGameTime + 1
-            db.session.commit()
-        elif room.getRound() > DRAW_ROUND:
-            # 回合较多，可以进行和棋
-            emit("draw", room=roomId)
+                emit(
+                    "updateBoard",
+                    {
+                        "place": data["place"],
+                        "IsBlack": user.get_IsBlack(),
+                        "id": other_user.get_userID(),  # Next move user is another user.
+                        "msg": "黑方回合" if other_user.get_IsBlack() else "白方回合",
+                    },
+                    room=data["roomId"]
+                )
+                if room.getSteps() > DRAW_ROUND:
+                    emit("draw", room=room.getRoomId())
+
+
+@socketio.on("chooseBlack")
+def handleChooseBlack(data):
+    room = roomManager.getRoom(data["roomId"])
+    user = room.get_user_by_id(data["userId"])
+    other_user = room.get_another_user(user)
+    IsBlack = data["IsBlack"]
+
+    user.set_IsBlack(IsBlack)
+    other_user.set_IsBlack(not IsBlack)
+    room.setInPrePhase(False)
+    # When the player choose white, then he can place, because there are BWB or BWBWB on the board, the next is W.
+    # B: Black; W: White
+    emit(
+        "updateBoard",
+        {
+            "id": user.get_userID() if not IsBlack else other_user.get_userID(),
+            "msg": "选择黑方" if IsBlack else "选择白方",
+            "user1_msg": f"用户名：{room.get_user1().get_username()}（{'黑' if room.get_user1().get_IsBlack() else '白'}子）",
+            "user2_msg": f"用户名：{room.get_user2().get_username()}（{'黑' if room.get_user2().get_IsBlack() else '白'}子）",
+            "clear": True,
+        },
+        room=data["roomId"]
+    )
+
+
+@socketio.on("choosePhase2")
+def handleChoosePhase2(data):
+    room = roomManager.getRoom(data["roomId"])
+    user = room.get_user_by_id(data["userId"])
+    # user.set_IsBlack(True)
+    emit(
+        "updateBoard",
+        {
+            "id": user.get_userID(),  # Next move user is the same.
+            "msg": "假后方任下两手",
+            "clear": True,
+        },
+        room=data["roomId"]
+    )
 
 
 @socketio.on("applyDraw")
 def applyDraw(data):
     # 申请和局
     roomId = data["roomId"]
-    first = data["first"]
-    emit("apply", {"first": first}, room=roomId)
+    userId = data["userId"]
+    emit("apply", {"userId": userId}, room=roomId)
 
 
 @socketio.on("acceptApply")
@@ -412,18 +564,20 @@ def acceptApply(data):
     # 接受和局
     roomId = data["roomId"]
     emit("drawn", room=roomId)
-    user1Id, user2Id = map(int, roomId.split("-"))
-    user1 = db.session.query(User).get(user1Id)
-    user1.totalGameTime = user1.totalGameTime + 1
-    user2 = db.session.query(User).get(user2Id)
-    user2.totalGameTime = user2.totalGameTime + 1
-    db.session.commit()
+    room = roomManager.getRoom(roomId)
+
+    db = get_db()
+    db.execute(
+        'UPDATE user SET totalGame = totalGame + 1 WHERE id IN (?, ?)',
+        (room.get_user1().get_userID(), room.get_user2().get_userID())
+    )
+    db.commit()
 
 
 @socketio.on("rejectApply")
 def rejectApply(data):
     # 拒绝和局
-    emit("rejected", room=data["roomId"])
+    emit("rejected", {"userId": data["userId"]}, room=data["roomId"])
 
 
 @socketio.on("leave")
@@ -472,12 +626,11 @@ def handleHeartbeat(data):
     # 更新心跳时间
     room = roomManager.getRoom(data["roomId"])
     try:
-        
         room.getUser1Heartbeat()
-        room.getUser2Heartbeat()    
+        room.getUser2Heartbeat()
     except:
-        socketio.emit("timeout", room=room)
-    if data["first"]:
+        socketio.emit("timeout", room=data["roomId"])
+    if data["userId"] == room.get_user1().get_userID():
         room.setUser1Heartbeat(time.time())
     else:
         room.setUser2Heartbeat(time.time())

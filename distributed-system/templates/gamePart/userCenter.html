@@ -78,6 +78,7 @@
             socket.on("connect", function () {
                 socket.emit("connected", {"userId": userID});
             });
+
             // 更新用户信息
             socket.on("user_info", function (data) {
                 $("#user-name").text(data["userName"]);
@@ -88,6 +89,7 @@
                 const span = $("<span></span>").text(data["userName"]);
                 $(".navbar-text").prepend(span);
             });
+
             // 弹窗提示
             socket.on('joinWait', function (data) {
                 if (!showed) {
@@ -96,6 +98,7 @@
                 }
                 $("#wait-time").text(data["time"]);
             });
+
             socket.on("joinFail", function () {
                 showed = false;
                 joined = false;
@@ -105,21 +108,12 @@
                     $('#joinFailModal').modal('hide');
                 }, 1500);
             });
+
             // 加入游戏，进入游戏页面
             socket.on("joinSuccess", function (data) {
                 const form = document.createElement("form");
                 form.method = "POST";
                 form.action = "/game";
-                const inputUser1Name = document.createElement("input");
-                inputUser1Name.type = "hidden";
-                inputUser1Name.name = "user1Name";
-                inputUser1Name.value = data["user1Name"];
-                form.appendChild(inputUser1Name);
-                const inputUser2Name = document.createElement("input");
-                inputUser2Name.type = "hidden";
-                inputUser2Name.name = "user2Name";
-                inputUser2Name.value = data["user2Name"];
-                form.appendChild(inputUser2Name);
                 const inputRoomId = document.createElement("input");
                 inputRoomId.type = "hidden";
                 inputRoomId.name = "roomId";
@@ -130,16 +124,6 @@
                 inputUserId.name = "userId";
                 inputUserId.value = data["userId"];
                 form.appendChild(inputUserId);
-                const inputUserName = document.createElement("input");
-                inputUserName.type = "hidden";
-                inputUserName.name = "userName";
-                inputUserName.value = data["userName"];
-                form.appendChild(inputUserName);
-                const inputFirst = document.createElement("input");
-                inputFirst.type = "hidden";
-                inputFirst.name = "first";
-                inputFirst.value = data["first"];
-                form.appendChild(inputFirst);
                 socket.close();
                 document.body.appendChild(form);
                 form.submit();
