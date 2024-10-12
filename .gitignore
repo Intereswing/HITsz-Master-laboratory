@@ -1,5 +1,6 @@
-.idea/
+**/.idea/
 **/*.dat
 **/*.npy
 **/data/
 **/plots/
+**/.report/
