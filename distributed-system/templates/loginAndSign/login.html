@@ -1,36 +1,35 @@
 {% extends "loginAndSign/base.html" %}
 
-{% block title %}GoMoKu - 用户登录{% endblock %}
+{% block title %}GoMoKu - User Login{% endblock %}
 
 {% block body %}
     <div class="container">
         <div class="col-md-6">
             <div class="card">
                 <div class="card-body">
-                    <h3 class="card-title text-center">用户登录</h3>
+                    <h3 class="card-title text-center">User Login</h3>
                     <form id="login-form">
                         <div class="mb-3">
-                            <label for="userName" class="form-label">用户名</label>
+                            <label for="userName" class="form-label">Username</label>
                             <input type="text" class="form-control" id="userName" name="userName" required>
                         </div>
                         <div class="mb-3">
-                            <label for="password" class="form-label">密码</label>
+                            <label for="password" class="form-label">Password</label>
                             <input type="password" class="form-control" id="password" name="password" required>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100">登录</button>
+                        <button type="submit" class="btn btn-primary w-100">Login</button>
                     </form>
                     <hr>
                     <div class="text-center">
-                        
-                        <h4 class="card-title text-center">还没有账号？</h4>
-                        <button class="btn btn-primary w-100" href="#" onclick="toSign()">立即注册</button>
+                        <h3 class="card-title text-center">Don't have an account?</h3>
+                        <button class="btn btn-primary w-100" href="#" onclick="toSign()">Register Now</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     <script>
-        const socket = io.connect("http://10.249.41.193:5000");
+        const socket = io.connect("http://192.168.31.173:5000");
 	let shown = false;
         // 提交用户登录的数据
         document.getElementById("login-form").addEventListener("submit", function (event) {
@@ -60,7 +59,7 @@
                 const alertDiv = document.createElement("div");
                 alertDiv.id = "login-error"
                 alertDiv.className = "alert alert-danger";
-                alertDiv.innerText = "登录失败，请检查用户名和密码";
+                alertDiv.innerText = "Login fail, check the username and password.";
                 alertDiv.setAttribute("role", "alert");
                 const cardBodyDiv = document.querySelector(".card-body");
                 const loginForm = document.querySelector("#login-form");

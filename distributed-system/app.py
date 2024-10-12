@@ -87,7 +87,7 @@ def handleSign(data):
             )
             db.commit()
         except db.IntegrityError:
-            error = 'Username already taken.'
+            emit("sign_fail")
         else:
             emit("sign_success")
         finally:
@@ -443,7 +443,7 @@ def handleMove(data):
                     "place": data["place"],
                     "IsBlack": user.get_IsBlack(),
                     "id": user.get_userID(), # Next move user is the same.
-                    "msg": "假先方任下三手",
+                    "msg": "Tentative first player places three stones",
                 },
                 room=data["roomId"]
             )
@@ -455,7 +455,7 @@ def handleMove(data):
             emit("updateBoard",
                  {"place": data["place"], "IsBlack": user.get_IsBlack()}, room=data["roomId"])
             emit("phase1Choose",
-                 {"id": other_user.get_userID(), "msg": "假后方选择"}, room=data["roomId"])
+                 {"id": other_user.get_userID(), "msg": "Tentative second player choose"}, room=data["roomId"])
 
         # Phase 2: tentative second player places two stones, one black and one white.
         elif room.isInPrePhase():
@@ -466,7 +466,7 @@ def handleMove(data):
                         "place": data["place"],
                         "IsBlack": user.get_IsBlack(),
                         "id": user.get_userID(),  # Next move user is the same.
-                        "msg": "假后方任下两手",
+                        "msg": "Tentative second player places two stones.",
                     },
                     room=data["roomId"]
                 )
@@ -476,7 +476,7 @@ def handleMove(data):
                 emit("updateBoard",
                      {"place": data["place"], "IsBlack": user.get_IsBlack()}, room=data["roomId"])
                 emit("phase2Choose",
-                     {"id": other_user.get_userID(), "msg": "假先方选择"}, room=data["roomId"])
+                     {"id": other_user.get_userID(), "msg": "Tentative first player choose"}, room=data["roomId"])
             else: raise RuntimeError("Already placed 5 stones, but not get in normal phase.")
 
         # Normal play.
@@ -503,7 +503,7 @@ def handleMove(data):
                         "place": data["place"],
                         "IsBlack": user.get_IsBlack(),
                         "id": other_user.get_userID(),  # Next move user is another user.
-                        "msg": "黑方回合" if other_user.get_IsBlack() else "白方回合",
+                        "msg": "Black Turn" if other_user.get_IsBlack() else "White Turn",
                     },
                     room=data["roomId"]
                 )
@@ -527,9 +527,9 @@ def handleChooseBlack(data):
         "updateBoard",
         {
             "id": user.get_userID() if not IsBlack else other_user.get_userID(),
-            "msg": "选择黑方" if IsBlack else "选择白方",
-            "user1_msg": f"用户名：{room.get_user1().get_username()}（{'黑' if room.get_user1().get_IsBlack() else '白'}子）",
-            "user2_msg": f"用户名：{room.get_user2().get_username()}（{'黑' if room.get_user2().get_IsBlack() else '白'}子）",
+            "msg": "Choose black" if IsBlack else "Choose white",
+            "user1_msg": f"Username：{room.get_user1().get_username()}({'Black' if room.get_user1().get_IsBlack() else 'White'} Stone)",
+            "user2_msg": f"Username：{room.get_user2().get_username()}({'Black' if room.get_user2().get_IsBlack() else 'White'} Stone)",
             "clear": True,
         },
         room=data["roomId"]
@@ -545,7 +545,7 @@ def handleChoosePhase2(data):
         "updateBoard",
         {
             "id": user.get_userID(),  # Next move user is the same.
-            "msg": "假后方任下两手",
+            "msg": "Tentative second player places two stones",
             "clear": True,
         },
         room=data["roomId"]

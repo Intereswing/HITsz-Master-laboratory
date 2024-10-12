@@ -1,54 +1,73 @@
 body {
-    background-color: #f0f0f0;
+    background-color: #0da9f0; /* Light grey background */
+    font-family: 'Arial', sans-serif; /* Adding a generic font family for better text rendering */
 }
-
-#userTable {
-    width: 45%;
-    border-collapse: collapse;
-    margin: 15px auto 0;
-}
-
-#userTable td {
-    border: 2px solid black;
-    padding: 10px;
-    font-weight: bold;
-}
-
-#systemTable {
-    width: 45%;
-    margin: 10px auto;
-    border-collapse: collapse;
-    text-align: center;
-    font-weight: bold;
-}
-
-#systemTable td {
-    border: 2px solid black;
-    padding: 10px;
-}
-
+#userTable,
+#systemTable,
+#Room,
 #gameTable {
-    width: 520px;
-    height: 520px;
-    margin: 0 auto;
+    width: 60%; /* Increased width for better visibility */
+    margin: 20px auto; /* Increased margin for spacing */
     border-collapse: collapse;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Adding a subtle shadow for depth */
 }
 
+#userTable td,
+#systemTable td,
+#Room td {
+    border: 2px solid #333; /* Darker border color */
+    padding: 15px; /* Increased padding for comfort */
+    font-weight: bold;
+    background-color: #fff; /* White background for cells */
+    color: #333; /* Dark text color for contrast */
+}
+.container {
+    display: flex;
+}
+#gameTable {
+    width: 600px; /* Slightly increased size */
+    height: 600px; /* Slightly increased size */
+    margin: 20px auto; /* Adjusted margin for balance */
+    background-color: #fff; /* White background for the game table */
+}
+#userTable {
+    margin-top: 200px; /* 为第二个表格增加顶部外边距 */
+}
 .gameCell {
-    width: 50px;
-    height: 50px;
-    border: 1px solid black;
-    padding: 0;
-    position: relative;
+    width: 60px; /* Increased cell size */
+    height: 60px; /* Increased cell size */
+    border: 3px solid #666; /* Thicker border with a medium-dark color */
 }
 
 .gameCell img {
     width: 100%;
     height: 100%;
-    display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    border: 1px solid black;
+    border: none; /* Removed border from images to focus on cell border */
     box-sizing: border-box;
+    transition: transform 0.2s ease; /* Smooth transformation for better UX */
+}
+
+/* Hover effect for game cells to indicate interactivity */
+.gameCell:hover img {
+    transform: scale(1.1); /* Slight zoom effect on hover */
+}
+
+/* Styling the logout button */
+#logout {
+    background-color: #4CAF50; /* Green background for the logout button */
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: 5px; /* Rounded corners for a modern look */
+    transition: background-color 0.3s; /* Transition for hover effect */
+}
+
+#logout:hover {
+    background-color: #45a049; /* Darker green on hover */
 }

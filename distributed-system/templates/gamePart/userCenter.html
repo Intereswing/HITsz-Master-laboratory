@@ -1,6 +1,6 @@
 {% extends "gamePart/base.html" %}
 
-{% block title %}GoMoKu - 用户中心{% endblock %}
+{% block title %}GoMoKu - User Center{% endblock %}
 
 {% block external %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/userCenter.css') }}">
@@ -10,51 +10,51 @@
     <div class="container mt-5">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title mx-auto">用户中心</h5>
+                <h5 class="card-title mx-auto">User Center</h5>
             </div>
             <div class="card-body">
-                <p class="card-text">用户名：<span id="user-name"></span></p>
-                <!-- <p class="card-text">邮箱：<span id="user-email"></span></p> -->
-                <p class="card-text">在线对战次数：<span id="total-game-time"></span></p>
-                <p class="card-text">在线取胜次数：<span id="win-game-time"></span></p>
-                <p class="card-text">胜率：<span id="win-rate"></span></p>
+                <p class="card-text">Username: <span id="user-name"></span></p>
+                <!-- <p class="card-text">Email: <span id="user-email"></span></p> -->
+                <p class="card-text">Online Match Count: <span id="total-game-time"></span></p>
+                <p class="card-text">Online Win Count: <span id="win-game-time"></span></p>
+                <p class="card-text">Win Rate: <span id="win-rate"></span></p>
             </div>
             <div class="card-footer text-center">
                 <div class="row d-flex justify-content-center">
                     <div class="col-sm-1">
                         <div class="row">
-                            <a href="#" class="btn btn-primary btn-block" onclick="joinGame()">开始游戏</a>
+                            <a href="#" class="btn btn-primary btn-block" onclick="joinGame()">Start Game</a>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <!-- 等待其他玩家加入的弹窗 -->
+    <!-- Waiting for other players to join modal -->
     <div class="modal fade" id="joinWaitModal" tabindex="-1" aria-labelledby="joinWaitModalLabel"
          aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="joinWaitModalLabel">游戏等待</h5>
+                    <h5 class="modal-title" id="joinWaitModalLabel">Game Waiting</h5>
                 </div>
                 <div class="modal-body">
-                    <p>请稍候，正在等待其他玩家加入。</p>
-                    <p>已等待 <span id="wait-time">0</span> 秒...</p>
+                    <p>Please wait, waiting for other players to join.</p>
+                    <p>Already waited <span id="wait-time">0</span> seconds...</p>
                 </div>
             </div>
         </div>
     </div>
-    <!-- 提示稍后重新加入游戏的弹窗 -->
+    <!-- Prompt to rejoin the game later modal -->
     <div class="modal fade" id="joinFailModal" tabindex="-1" aria-labelledby="joinFailModalLabel"
          aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="joinFailModalLabel">稍后重试</h5>
+                    <h5 class="modal-title" id="joinFailModalLabel">Retry Later</h5>
                 </div>
                 <div class="modal-body">
-                    <p>当前在线玩家较少，请稍后重试。</p>
+                    <p>There are few online players currently, please retry later.</p>
                 </div>
             </div>
         </div>

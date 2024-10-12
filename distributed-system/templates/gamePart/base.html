@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="en">
 <head>
     <title>{% block title %}{% endblock %}</title>
     <meta charset="utf-8">
@@ -13,13 +13,13 @@
 <body>
 <nav class="navbar navbar-primary bg-primary text-white">
     <div class="container-fluid">
-        <span class="navbar-brand mb-0 h1 text-white" id="welcome">欢迎登录 五子棋系统！</span>
+        <span class="navbar-brand mb-0 h1 text-white" id="welcome">Welcome to the Gomoku System!</span>
         <div class="navbar-text text-white">
-            <a href="#" class="btn btn-outline-light ms-2 text-white" onclick="toLogin()" id="logout">注销</a>
+            <a href="#" class="btn btn-outline-light ms-2 text-white" onclick="toLogin()" id="logout">Logout</a>
         </div>
     </div>
     <script>
-        const socket = io.connect("http://10.249.41.193:5000");
+        const socket = io.connect("http://192.168.31.173:5000");
         // 192.168.1.252:5000
         function toLogin() {
             socket.emit("toLogin");

@@ -1,25 +1,36 @@
 {% extends "gamePart/base.html" %}
 
-{% block title %}GoMoKu - 进行游戏{% endblock %}
+{% block title %}GoMoKu - Play Game{% endblock %}
 
 {% block external %}
     <link rel="stylesheet" type="text/css" href="{{ url_for("static", filename="css/game.css") }}">
 {% endblock %}
 
 {% block content %}
+    <div class="container">
+<div class="tables-container">
     <table id="userTable">
         <tr>
-            <td id="user1Name">用户名：{{ user1Name }}（假先方）</td>
-            <td id="user2Name">用户名：{{ user2Name }}（假后方）</td>
+            <td id="user1Name">Tentative First：{{ user1Name }}</td>
         </tr>
     </table>
-
+    <table id="userTable">
+        <tr>
+            <td id="user2Name">Tentative Second：{{ user2Name }}</td>
+        </tr>
+    </table>
+</div>
+<div class="game-table-container">
     <table id="systemTable">
         <tr>
             <td id="systemMsg">GoMoKu Swap2</td>
         </tr>
     </table>
-
+    <table id="Room">
+        <tr>
+             <td>Room Number: {{ roomId.split('_')[0] }}</td>
+        </tr>
+    </table>
     <table id="gameTable">
         <tbody>
         {% for i in range(10) %}
@@ -34,18 +45,20 @@
         {% endfor %}
         </tbody>
     </table>
+</div>
+    </div>
 
     <!-- 第一阶段结束假后方选择 -->
     <div id="tentative_second_choosing_dialog" class="modal fade" role="dialog">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h4 class="modal-title">假后方选择</h4>
+                    <h4 class="modal-title">Tentative Second Choose</h4>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" onclick="chooseBlack(true)">选择黑子</button>
-                    <button type="button" class="btn btn-primary" onclick="chooseBlack(false)">选择白子</button>
-                    <button type="button" class="btn btn-primary" onclick="choosePhase2()">下两子让对方选择</button>
+                    <button type="button" class="btn btn-primary" onclick="chooseBlack(true)">Choose Black</button>
+                    <button type="button" class="btn btn-primary" onclick="chooseBlack(false)">Choose White</button>
+                    <button type="button" class="btn btn-primary" onclick="choosePhase2()">Place two stones and let the other player choose.</button>
                 </div>
             </div>
         </div>
@@ -56,11 +69,11 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h4 class="modal-title">假先方选择</h4>
+                    <h4 class="modal-title">Tentative First Choose</h4>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" onclick="chooseBlack(true)">选择黑子</button>
-                    <button type="button" class="btn btn-primary" onclick="chooseBlack(false)">选择白子</button>
+                    <button type="button" class="btn btn-primary" onclick="chooseBlack(true)">Choose Black</button>
+                    <button type="button" class="btn btn-primary" onclick="chooseBlack(false)">Choose White</button>
                 </div>
             </div>
         </div>
@@ -70,70 +83,64 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-body">
-                    <p>等待对方选择</p>
+                    <p>Waiting for opponent choice</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 和局弹窗 -->
+    <!-- Draw Request Modal -->
     <div id="confirmDialog" class="modal fade" role="dialog">
         <div class="modal-dialog">
             <!-- Modal content-->
             <div class="modal-content">
                 <div class="modal-header">
-                    <h4 class="modal-title">和局请求</h4>
+                    <h4 class="modal-title">Draw Request</h4>
                 </div>
                 <div class="modal-body" style="text-align: center">
-                    <p>你是否接受对方的和局请求？</p>
+                    <p>Do you accept the opponent's draw request?</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-warning" data-dismiss="modal" onclick="rejectApply()">拒绝
-                    </button>
-                    <button type="button" class="btn btn-primary" onclick="acceptApply()">接受</button>
+                    <button type="button" class="btn btn-warning" data-dismiss="modal" onclick="rejectApply()">Reject</button>
+                    <button type="button" class="btn btn-primary" onclick="acceptApply()">Accept</button>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- 拒绝弹窗 -->
+    <!-- Rejected Modal -->
     <div id="infoDialog" class="modal fade" role="dialog">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h4 class="modal-title">请求被拒绝</h4>
+                    <h4 class="modal-title">Request Rejected</h4>
                 </div>
                 <div class="modal-body">
-                    <p>很抱歉，您的和局请求被对方拒绝，请继续游戏。</p>
+                    <p>We are sorry, your draw request has been rejected by the opponent, please continue the game.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-primary" data-dismiss="modal"
-                            onclick="confirmReject()">确认
-                    </button>
+                            onclick="confirmReject()">Confirm</button>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- 对方掉线弹窗 -->
+    <!-- Opponent Disconnected Modal -->
     <div id="timeoutDialog" class="modal fade" role="dialog">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h4 class="modal-title">对手掉线</h4>
+                    <h4 class="modal-title">Opponent Disconnected</h4>
                 </div>
                 <div class="modal-body">
-                    <p>很抱歉，您的对手掉线了，您可以重新加入游戏。</p>
+                    <p>We are sorry, your opponent has disconnected, you can rejoin the game.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-primary" data-dismiss="modal"
-                            onclick="confirmTimeout()">确认
-                    </button>
+                            onclick="confirmTimeout()">Confirm</button>
                 </div>
             </div>
         </div>
     </div>
-
     <script>
         document.getElementById("logout").disabled = true;
 
@@ -249,9 +256,9 @@
                     const sysMsg = document.getElementById("systemMsg");
                     if (userId === data["id"]) {
                         CanMove = true;
-                        sysMsg.textContent += "，我的回合";
+                        sysMsg.textContent += "，My turn";
                     }
-                    else {sysMsg.textContent += "，对手回合";}
+                    else {sysMsg.textContent += "，Opponent's turn";}
 
                 }
             });
@@ -287,13 +294,13 @@
                     sysMsg.textContent = "LOSE"
                 }
                 const welcome = document.getElementById("welcome");
-                welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>返回用户中心</button>";
+                welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>Return to User Center</button>";
             });
 
             // 进行和局
             socket.on("draw", function () {
                 const welcome = document.getElementById("welcome");
-                welcome.innerHTML = "<button class='btn btn-info text-white' onclick='applyDraw()'>请求和局</button>";
+                welcome.innerHTML = "<button class='btn btn-info text-white' onclick='applyDraw()'>Apply Draw</button>";
             });
 
             // 接受和局请求
@@ -306,9 +313,9 @@
             // 双方和局
             socket.on("drawn", function () {
                 CanMove = false;
-                document.getElementById("systemMsg").textContent = "双方合局";
+                document.getElementById("systemMsg").textContent = "Both sides agree to a draw";
                 const welcome = document.getElementById("welcome");
-                welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>返回用户中心</button>";
+                welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>Return to User Center</button>";
             });
 
             // 拒绝和局
@@ -323,9 +330,9 @@
                 $("#timeoutDialog").modal("show");
                 CanMove = false;
                 sendHeartbeat = false;
-                document.getElementById("systemMsg").textContent = "对手掉线";
+                document.getElementById("systemMsg").textContent = "Opponent Disconnected";
                 const welcome = document.getElementById("welcome");
-                welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>返回用户中心</button>";
+                welcome.innerHTML = "<button class='btn btn-danger' onclick='toUserCenter()'>Return to User Center</button>";
                 socket.emit("leave", {"roomId": roomId});
             });
         });

@@ -1,7 +1,7 @@
 {% extends 'loginAndSign/base.html' %}
 
 {% block title %}
-    GoMoKu - 用户注册
+    GoMoKu - User Registration
 {% endblock %}
 
 {% block body %}
@@ -9,29 +9,28 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-body">
-                    <h3 class="card-title text-center">用户注册</h3>
+                    <h3 class="card-title text-center">User Registration</h3>
                     <form id="sign-form">
                         <!-- <div class="mb-3">
-                            <label for="email" class="form-label">邮箱</label>
+                            <label for="email" class="form-label">Email</label>
                             <input type="email" class="form-control" id="email" name="email" required>
                         </div> -->
                         <div class="mb-3">
-                            <label for="nickname" class="form-label">昵称</label>
+                            <label for="nickname" class="form-label">Nickname</label>
                             <input type="text" class="form-control" id="nickname" name="nickname" required>
                         </div>
                         <div class="mb-3">
-                            <label for="password" class="form-label">密码</label>
+                            <label for="password" class="form-label">Password</label>
                             <input type="password" class="form-control" id="password" name="password" required>
                         </div>
                         <div class="mb-3">
-                            <label for="confirm-password" class="form-label">确认密码</label>
-                            <input type="password" class="form-control" id="confirm-password" name="confirm-password"
-                                   required>
+                            <label for="confirm-password" class="form-label">Confirm Password</label>
+                            <input type="password" class="form-control" id="confirm-password" name="confirm-password" required>
                         </div>
                         <div id="password-error" class="alert alert-danger d-none" role="alert">
-                            两次输入的密码不匹配，请重新输入。
+                            The passwords do not match, please try again.
                         </div>
-                        <button type="submit" id="sign" class="btn btn-primary w-100">注册</button>
+                        <button type="submit" id="sign" class="btn btn-primary w-100">Register</button>
                     </form>
                     <script>
                         // 获取对应的页面对象
@@ -42,7 +41,7 @@
                         confirmPassword.addEventListener('input', () => {
                             if (password.value !== confirmPassword.value) {
                                 submitButton.disabled = true;
-                                confirmPassword.setCustomValidity('两次输入的密码不相同');
+                                confirmPassword.setCustomValidity('The second password is not consistent to the first');
                             } else {
                                 submitButton.disabled = false;
                                 confirmPassword.setCustomValidity('');
@@ -61,15 +60,15 @@
                     </script>
                     <hr>
                     <div class="text-center">
-                        <p>已有账号？</p>
-                        <a href="#" onclick="toLogin()">立即登录</a>
+                        <p>Already have an account?</p>
+                        <a href="#" onclick="toLogin()">Log in now</a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     <script>
-        const socket = io.connect("http://10.249.41.193:5000");
+        const socket = io.connect("http://192.168.31.173:5000");
 	let shown = false;
         // 提交用户登录的数据
         document.getElementById("sign-form").addEventListener("submit", function (event) {
@@ -90,7 +89,7 @@
                 const alertDiv = document.createElement("div");
                 alertDiv.id = "signed-error"
                 alertDiv.className = "alert alert-danger";
-                alertDiv.innerText = "您当前输入的邮箱已经被注册过，请进行登录";
+                alertDiv.innerText = "Your username is registered.";
                 alertDiv.setAttribute("role", "alert");
                 const cardBodyDiv = document.querySelector(".card-body");
                 const signForm = document.querySelector("#sign-form");

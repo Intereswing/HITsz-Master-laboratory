@@ -1,10 +1,28 @@
 # Internet GoMoKu Game
 
-First, mark the templates as Template Folder in Pycharm.
+## Usage
+### 1: Mark the Template Folder.
+Mark `templates/` as Template Folder in Pycharm
 
-Second, establish the database using ```flask --app app init-db``` when under 
-folder distributed-system.
+### 2: Initialize the database
+When under the project folder, run the following commanding line.
 
-Third, replace the url in login.html and sign.html with your PC's ip.
+```flask --app app init-db``` 
 
-Finally, run app.py.
+This project uses sqlite and may need some configuration in Pycharm in order to use the database.
+
+### 3: Replace the urls
+Replace the url in the script line
+
+```const socket = io.connect("http://192.168.31.173:5000");``` 
+
+with your PC's ip and port in files
+
+`templates/loginAndSign/login.html`
+
+`templates/loginAndSign/sign.html`
+
+`templates/gamePart/base.html`
+
+### 4: Run the app.
+```python app.py```
