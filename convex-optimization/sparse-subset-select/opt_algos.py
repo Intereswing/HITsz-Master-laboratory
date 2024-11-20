@@ -124,10 +124,10 @@ def Steepest_Descend(X: ndarray, beta: ndarray, y, lamb1, lamb2, eta, epsilon, m
 def Newton_Descend(X: ndarray, beta: ndarray, y, lamb1, lamb2, eta, epsilon, max_iteration=10000):
     beta = beta.copy()
     f = evaluate_func(X, beta, y, lamb1, lamb2)
-    direction = np.linalg.inv(Hessian(X, beta, y, lamb1, lamb2)) @ gradient(X, beta, y, lamb1, lamb2)
 
     iteration = 1
     while True:
+        direction = np.linalg.inv(Hessian(X, beta, y, lamb1, lamb2)) @ gradient(X, beta, y, lamb1, lamb2)
         beta_new = beta - eta * direction
         f_new = evaluate_func(X, beta_new, y, lamb1, lamb2)
         # beta_star = np.where(np.abs(beta_new) < 1e-3, 0, beta_new)
@@ -142,6 +142,83 @@ def Newton_Descend(X: ndarray, beta: ndarray, y, lamb1, lamb2, eta, epsilon, max
     beta_star = np.where(np.abs(beta_new) < 1e-2, 0, beta_new)
     return beta_star, iteration
 
+
+def Coordinator_Descend(X: ndarray, beta: ndarray, y, lamb1, lamb2, eta, epsilon, max_iteration=10000):
+    beta = beta.copy()
+    f = evaluate_func(X, beta, y, lamb1, lamb2)
+
+    iteration = 1
+    while True:
+        beta_new = beta.copy()
+        # for every axis
+        for i in range(beta.shape[0]):
+            f_min = f
+            beta_i = beta[i]
+            # search min in [-eta, eta]
+            for step in np.linspace(-eta, eta, 11):
+                beta[i] = beta_i + step
+                if evaluate_func(X, beta, y, lamb1, lamb2) < f_min:
+                    f_min = evaluate_func(X, beta, y, lamb1, lamb2)
+                    beta_new[i] = beta[i]
+            beta[i] = beta_i
+
+        f_new = evaluate_func(X, beta_new, y, lamb1, lamb2)
+
+        if abs(f_new - f) > epsilon and iteration < max_iteration:
+            beta, f = beta_new, f_new
+            iteration += 1
+        else:
+            break
+
+    beta_star = np.where(np.abs(beta_new) < 1e-2, 0, beta_new)
+    return beta_star, iteration
+
+
+def Lagrange_Duel_Function(X: ndarray, beta: ndarray, y, v, k):
+    N = X.shape[0]
+    value = 1/(2*N) * np.sum((X@beta-y)**2)
+    value += v*(np.sum(beta!=0) - k)
+    return value
+
+
+def Lagrange_Duel(X: ndarray, beta: ndarray, y, v, k, eta, epsilon, max_iteration=10000):
+    beta = beta.copy()
+    f = Lagrange_Duel_Function(X, beta, y, v, k)
+
+    iteration = 1
+    while True:
+        while True:
+            beta_new = beta.copy()
+            # for every axis
+            for i in range(beta.shape[0]):
+                f_min = f
+                beta_i = beta[i]
+                # search min in [-eta, eta]
+                for step in np.linspace(-eta, eta, 11):
+                    beta[i] = beta_i + step
+                    if Lagrange_Duel_Function(X, beta, y, v, k) < f_min:
+                        f_min = Lagrange_Duel_Function(X, beta, y, v, k)
+                        beta_new[i] = beta[i]
+                beta[i] = beta_i
+
+            f_new = Lagrange_Duel_Function(X, beta_new, y, v, k)
+
+            if abs(f_new - f) > epsilon and iteration < max_iteration:
+                beta, f = beta_new, f_new
+                iteration += 1
+            else:
+                break
+        beta_star = np.where(np.abs(beta_new) < 1e-2, 0, beta_new)
+
+        v_new = max(v + eta * (np.sum(beta_star!=0) - k), 0)
+        f_new = Lagrange_Duel_Function(X, beta_star, y, v_new, k)
+        if abs(f_new - f) > epsilon and iteration < max_iteration:
+            beta, f = beta_new, f_new
+            iteration += 1
+        else:
+            break
+
+    return beta_star, iteration
 
 
 
