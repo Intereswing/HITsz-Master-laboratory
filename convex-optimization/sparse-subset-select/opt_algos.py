@@ -1,5 +1,6 @@
 import numpy as np
 from numpy import ndarray
+from scipy.optimize import direct
 
 
 # f_1(beta) = ||X*beta||^2_2/2n + lamb1*||beta||_1 + lamb2*||beta||_2^2
@@ -67,13 +68,79 @@ def Grad_Descend(X: ndarray, beta: ndarray, y, lamb1, lamb2, eta, epsilon, max_i
     return beta_star, iteration
 
 
+def Steepest_Descend(X: ndarray, beta: ndarray, y, lamb1, lamb2, eta, epsilon, max_iteration=10000):
+    iteration = 1
+
+    beta = beta.copy()
+    f = evaluate_func(X, beta, y, lamb1, lamb2)
+    golden = 0.618
+    while True:
+        direction = gradient(X, beta, y, lamb1, lamb2)
+        step = eta
+        # find the range of minimum
+        while evaluate_func(X, beta - step * direction, y, lamb1, lamb2) < f:
+            step = step/golden
+        while evaluate_func(X, beta - golden * step * direction, y, lamb1, lamb2) > f:
+            step = step * golden
+        # golden search for the best step
+        start = 0
+        end = step
+        golden_mid = step * golden
+        while end - start > 1e-5:
+            if golden_mid - start > end - golden_mid:
+                golden_new = start + golden * (golden_mid - start)
+                f_gold_mid = evaluate_func(X, beta - golden_mid * direction, y, lamb1, lamb2)
+                f_gold_new = evaluate_func(X, beta - golden_new * direction, y, lamb1, lamb2)
+                if f_gold_mid < f_gold_new:
+                    start = golden_new
+                else:
+                    end = golden_mid
+                    golden_mid = golden_new
+            else:
+                golden_new = end - golden * (end - golden_mid)
+                f_gold_mid = evaluate_func(X, beta - golden_mid * direction, y, lamb1, lamb2)
+                f_gold_new = evaluate_func(X, beta - golden_new * direction, y, lamb1, lamb2)
+                if f_gold_mid < f_gold_new:
+                    end = golden_new
+                else:
+                    start = golden_mid
+                    golden_mid = golden_new
+        step = golden_mid
+
+        beta_new = beta - step * direction
+        f_new = evaluate_func(X, beta_new, y, lamb1, lamb2)
+        beta_star = np.where(np.abs(beta_new) < 1e-2, 0, beta_new)
+        f_star = evaluate_func(X, beta_star, y, lamb1, lamb2)
+
+        if (abs(f_new - f) > epsilon or abs(f_star - f_new) > epsilon)  and  iteration < max_iteration:
+            beta, f = beta_new, f_new
+            iteration += 1
+        else:
+            break
+
+    return beta_star, iteration
 
 
+def Newton_Descend(X: ndarray, beta: ndarray, y, lamb1, lamb2, eta, epsilon, max_iteration=10000):
+    beta = beta.copy()
+    f = evaluate_func(X, beta, y, lamb1, lamb2)
+    direction = np.linalg.inv(Hessian(X, beta, y, lamb1, lamb2)) @ gradient(X, beta, y, lamb1, lamb2)
 
+    iteration = 1
+    while True:
+        beta_new = beta - eta * direction
+        f_new = evaluate_func(X, beta_new, y, lamb1, lamb2)
+        # beta_star = np.where(np.abs(beta_new) < 1e-3, 0, beta_new)
+        # f_star = evaluate_func(X, beta_star, y, lamb1, lamb2)
 
+        if abs(f_new - f) > epsilon and iteration < max_iteration:
+            beta, f = beta_new, f_new
+            iteration += 1
+        else:
+            break
 
-
-
+    beta_star = np.where(np.abs(beta_new) < 1e-2, 0, beta_new)
+    return beta_star, iteration
 
 
 
