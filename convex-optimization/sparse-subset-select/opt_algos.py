@@ -220,8 +220,3 @@ def Lagrange_Duel(X: ndarray, beta: ndarray, y, v, k, eta, epsilon, max_iteratio
 
     return beta_star, iteration
 
-
-
-
-
-
