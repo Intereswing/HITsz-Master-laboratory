@@ -213,7 +213,7 @@ def Lagrange_Duel(X: ndarray, beta: ndarray, y, v, k, eta, epsilon, max_iteratio
         v_new = max(v + eta * (np.sum(beta_star!=0) - k), 0)
         f_new = Lagrange_Duel_Function(X, beta_star, y, v_new, k)
         if abs(f_new - f) > epsilon and iteration < max_iteration:
-            beta, f = beta_new, f_new
+            beta, f, v = beta_new, f_new, v_new
             iteration += 1
         else:
             break
