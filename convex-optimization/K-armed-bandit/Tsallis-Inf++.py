@@ -13,6 +13,11 @@ def Lagrange_Min_P(p, eta, c_hat, v, alpha, It):
     value += v * (np.sum(p_min) - 1)
     return value, p_min
 
+def KKT(p, eta, c_hat, v, alpha, It):
+    p_min = (p ** (1 / alpha - 1) + eta * c_hat - eta * v) ** (alpha / (1 - alpha))
+    original_feasible = np.sum(p_min) - 1
+    return p_min, original_feasible
+
 alpha = 2
 K = 20
 T = 10000
@@ -42,22 +47,20 @@ for _ in range(10):
         start = 0
         end = c_hat[It]
         while end - start > epsilon:
-            mid_left = (start + end)/2 - (end - start)/20
-            mid_right = (start + end)/2 + (end - start)/20
-            f_left, _ = Lagrange_Min_P(p, eta, c_hat, mid_left, alpha, It)
-            f_right, _ = Lagrange_Min_P(p, eta, c_hat, mid_right, alpha, It)
-            if f_left > f_right:
-                start = mid_left
+            mid = (start + end) / 2
+            _, orig_feasible = KKT(p, eta, c_hat, mid, alpha, It)
+            if orig_feasible > 0:
+                end = mid
             else:
-                end = mid_right
+                start = mid
 
         v = (start + end) / 2
-        _, p = Lagrange_Min_P(p, eta, c_hat, v, alpha, It)
+        p, _ = KKT(p, eta, c_hat, v, alpha, It)
         p = p / np.sum(p)
-    break
+
 
 
 print("p_10001:", p)
-print("result cost:", result_cost)
-print("fix choice cost:", fix_choice_cost)
+print("result cost:", result_cost / 10)
+print("fix choice cost:", fix_choice_cost / 10)
 
