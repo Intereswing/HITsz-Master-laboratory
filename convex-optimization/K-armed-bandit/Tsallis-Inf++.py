@@ -3,7 +3,7 @@ from turtledemo.penrose import start
 import numpy as np
 
 def Lagrange_Min_P(p, eta, c_hat, v, alpha, It):
-    p_min = (p ** (1/alpha - 1) + eta * c_hat - eta * v) ** (alpha / (1 - alpha))
+    p_min = (p ** (1/alpha - 1) + eta * c_hat + eta * v) ** (alpha / (1 - alpha))
 
     value = c_hat[It] * p_min[It]
     value += ((1/eta) *
@@ -14,7 +14,7 @@ def Lagrange_Min_P(p, eta, c_hat, v, alpha, It):
     return value, p_min
 
 def KKT(p, eta, c_hat, v, alpha, It):
-    p_min = (p ** (1 / alpha - 1) + eta * c_hat - eta * v) ** (alpha / (1 - alpha))
+    p_min = (p ** (1 / alpha - 1) + eta * c_hat + eta * v) ** (alpha / (1 - alpha))
     original_feasible = np.sum(p_min) - 1
     return p_min, original_feasible
 
@@ -32,7 +32,7 @@ fix_choice_cost = np.zeros(K)
 
 for _ in range(10):
     for i in range(C.shape[0]):
-        It = np.argmax(p)
+        It = np.random.choice(K, p=p)
         c = C[i, :]
         result_cost += c[It]
         fix_choice_cost += c
@@ -44,20 +44,19 @@ for _ in range(10):
             c_hat[It] = c[It] / (p[It] + eta)
 
         # Binary search for argmax Lagrange.
-        start = 0
-        end = c_hat[It]
+        start = -c_hat[It]
+        end = 0
         while end - start > epsilon:
             mid = (start + end) / 2
             _, orig_feasible = KKT(p, eta, c_hat, mid, alpha, It)
             if orig_feasible > 0:
-                end = mid
-            else:
                 start = mid
+            else:
+                end = mid
 
         v = (start + end) / 2
         p, _ = KKT(p, eta, c_hat, v, alpha, It)
         p = p / np.sum(p)
-
 
 
 print("p_10001:", p)
